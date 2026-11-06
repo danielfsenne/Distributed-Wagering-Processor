@@ -32,6 +32,7 @@ export interface CreateWagerTransactionProps {
 }
 
 export interface OpeningTransactionProps {
+  id?: string;
   walletId: string;
   playerId: string;
   money: Money;
@@ -125,7 +126,7 @@ export class WagerTransaction {
     }
     const externalTransactionId = `opening:${props.walletId}`;
     const transaction = new WagerTransaction(
-      newId(),
+      props.id ?? newId(),
       INTERNAL_PROVIDER_ID,
       externalTransactionId,
       `${INTERNAL_PROVIDER_ID}:${externalTransactionId}`,

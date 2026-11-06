@@ -21,7 +21,7 @@ export interface OpenWalletProps {
   id: string;
   playerId: string;
   initialBalance: Money;
-  openingTransactionId: string;
+  openingTransactionId?: string | undefined;
   at: Date;
 }
 
@@ -52,6 +52,9 @@ export class Wallet {
     if (props.initialBalance.isNegative()) {
       throw new InvalidAmountError('initial balance cannot be negative');
     }
+    if (props.initialBalance.isPositive() && !props.openingTransactionId) {
+      throw new InvalidAmountError('a positive initial balance requires an opening transaction');
+    }
     const currency = props.initialBalance.currency;
     const wallet = new Wallet(
       props.id,
@@ -65,7 +68,7 @@ export class Wallet {
     const openingEntry = props.initialBalance.isPositive()
       ? WalletLedgerEntry.create({
           walletId: wallet.id,
-          transactionId: props.openingTransactionId,
+          transactionId: props.openingTransactionId!,
           direction: LedgerDirection.Credit,
           money: props.initialBalance,
           balanceBefore: Money.zero(currency),

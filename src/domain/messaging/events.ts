@@ -111,6 +111,33 @@ export class WagerTransactionRejected extends IntegrationEvent<WagerTransactionR
   }
 }
 
+export interface WagerTransactionFailedData extends TransactionEventData {
+  failureCode: FailureCode;
+  failedAt: string;
+}
+
+export class WagerTransactionFailed extends IntegrationEvent<WagerTransactionFailedData> {
+  readonly eventType = 'WagerTransactionFailed';
+  readonly version = 1;
+
+  static from(transaction: WagerTransaction, context: EventContext): WagerTransactionFailed {
+    if (!transaction.failureCode) {
+      throw new Error(`Transaction ${transaction.id} has no failure code`);
+    }
+    return new WagerTransactionFailed(
+      IntegrationEvent.propsFrom(
+        transaction.id,
+        {
+          ...transactionData(transaction),
+          failureCode: transaction.failureCode,
+          failedAt: (transaction.processedAt ?? context.occurredAt).toISOString(),
+        },
+        context,
+      ),
+    );
+  }
+}
+
 export class WagerTransactionPendingReference extends IntegrationEvent<WagerTransactionPendingReferenceData> {
   readonly eventType = 'WagerTransactionPendingReference';
   readonly version = 1;
