@@ -7,31 +7,28 @@ import {
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import type { Request } from 'express';
+import type { ProviderPrincipal } from '../../application/provider-access';
 import { PROVIDER_IDENTITY } from './tokens';
 
 export const IS_PUBLIC = 'wagering:isPublic';
 export const Public = () => SetMetadata(IS_PUBLIC, true);
 
-export interface Principal {
-  subject: string;
-  providerIds: readonly string[] | '*';
-}
-
-export type AuthenticatedRequest = Request & { principal?: Principal };
+export type AuthenticatedRequest = Request & { principal?: ProviderPrincipal };
 
 export interface ProviderIdentityPort {
-  resolve(request: Request): Promise<Principal>;
-  assertMayActFor(principal: Principal | undefined, providerId: string): void;
+  resolve(request: Request): Promise<ProviderPrincipal>;
 }
 
-export const ANONYMOUS_PRINCIPAL: Principal = { subject: 'anonymous', providerIds: '*' };
+export const ANONYMOUS_PRINCIPAL: ProviderPrincipal = { subject: 'anonymous', providerIds: '*' };
 
 export class NoopProviderIdentity implements ProviderIdentityPort {
-  async resolve(): Promise<Principal> {
+  async resolve(): Promise<ProviderPrincipal> {
     return ANONYMOUS_PRINCIPAL;
   }
+}
 
-  assertMayActFor(): void {}
+export function principalOf(request: AuthenticatedRequest): ProviderPrincipal {
+  return request.principal ?? ANONYMOUS_PRINCIPAL;
 }
 
 @Injectable()

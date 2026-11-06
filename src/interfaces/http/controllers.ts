@@ -20,8 +20,9 @@ import { parseLimit } from '../../application/wallets/wallet-queries';
 import { WagerTransactionStatus } from '../../domain/wagering/wager-transaction-status';
 import type { Container } from '../../container';
 import { currentLogContext, enrichLogContext } from '../../infrastructure/observability/log-context';
-import { type AuthenticatedRequest, type ProviderIdentityPort, Public } from './auth';
-import { CONTAINER, PROVIDER_IDENTITY } from './tokens';
+import { assertMayActFor } from '../../application/provider-access';
+import { type AuthenticatedRequest, Public, principalOf } from './auth';
+import { CONTAINER } from './tokens';
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -85,10 +86,7 @@ export class WalletsController {
 
 @Controller()
 export class WageringController {
-  constructor(
-    @Inject(CONTAINER) private readonly container: Container,
-    @Inject(PROVIDER_IDENTITY) private readonly identity: ProviderIdentityPort,
-  ) {}
+  constructor(@Inject(CONTAINER) private readonly container: Container) {}
 
   @Post('wagering/transactions')
   async submit(
@@ -99,12 +97,12 @@ export class WageringController {
   ): Promise<WagerOutcome> {
     const idempotencyKey = parseIdempotencyKey(idempotencyKeyHeader);
     const payload = parseWagerPayload(body);
-    this.identity.assertMayActFor(request.principal, payload.providerId);
     enrichLogContext({ walletId: payload.walletId, providerId: payload.providerId });
 
     const outcome = await this.container.submitWager.execute({
       idempotencyKey,
       payload,
+      principal: principalOf(request),
       correlationId: correlationId(),
       causationId: idempotencyKey,
       source: 'http',
@@ -125,7 +123,7 @@ export class WageringController {
     @Param('externalTransactionId') externalTransactionId: string,
     @Req() request: AuthenticatedRequest,
   ) {
-    this.identity.assertMayActFor(request.principal, providerId);
+    assertMayActFor(principalOf(request), providerId);
     return this.container.queries.getTransactionByExternalId(providerId, externalTransactionId);
   }
 }

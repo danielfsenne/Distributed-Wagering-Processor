@@ -1,4 +1,5 @@
 import { PublishOutbox } from './application/outbox/publish-outbox';
+import { principalFor } from './application/provider-access';
 import type { Container } from './container';
 import { SqsWagerConsumer } from './infrastructure/messaging/sqs-wager-consumer';
 import { PeriodicTask } from './infrastructure/scheduling/periodic-task';
@@ -29,6 +30,7 @@ export function startWorker(container: Container, components: WorkerComponents =
       queueName: config.queues.transactions,
       deadLetterQueueName: config.queues.deadLetter,
       consumerName: config.consumer.name,
+      principal: principalFor(`sqs:${config.consumer.name}`, config.consumer.allowedProviders),
       maxAttempts: config.consumer.maxAttempts,
       concurrency: config.consumer.concurrency,
       waitTimeSeconds: config.consumer.waitTimeSeconds,

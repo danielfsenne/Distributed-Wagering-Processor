@@ -1,4 +1,4 @@
-export type ErrorCategory = 'validation' | 'conflict' | 'not-found' | 'transient';
+export type ErrorCategory = 'validation' | 'forbidden' | 'conflict' | 'not-found' | 'transient';
 
 export interface ValidationIssue {
   field: string;
@@ -28,6 +28,18 @@ export class ValidationError extends ApplicationError {
 
   static invalidPayload(issues: ValidationIssue[]): ValidationError {
     return new ValidationError('INVALID_PAYLOAD', 'The payload is invalid', issues);
+  }
+}
+
+export class ProviderNotAllowedError extends ApplicationError {
+  readonly code = 'PROVIDER_NOT_ALLOWED';
+  readonly category = 'forbidden';
+
+  constructor(
+    readonly subject: string,
+    readonly providerId: string,
+  ) {
+    super(`Principal ${subject} may not act for provider ${providerId}`);
   }
 }
 

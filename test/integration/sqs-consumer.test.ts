@@ -1,3 +1,4 @@
+import { TRUSTED_INTERNAL_PRINCIPAL, principalFor } from '../../src/application/provider-access';
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'bun:test';
 import { ReceiveMessageCommand } from '@aws-sdk/client-sqs';
 import { TransientError } from '../../src/application/errors';
@@ -41,6 +42,7 @@ function options(overrides: Partial<SqsConsumerOptions> = {}): SqsConsumerOption
     queueName: queues.main,
     deadLetterQueueName: queues.deadLetter,
     consumerName: `consumer-${newId()}`,
+    principal: TRUSTED_INTERNAL_PRINCIPAL,
     maxAttempts: 3,
     concurrency: 10,
     waitTimeSeconds: 1,
@@ -161,6 +163,24 @@ describe('SQS consumer', () => {
     expect(await approximateCount(container.sqs, queues.urls.main)).toBe(0);
   });
 
+  it('applies the same provider validation to queue messages and dead-letters unauthorized providers', async () => {
+    queues = await createTestQueues(container.sqs);
+    const wallet = await openWallet('100.00');
+    const { message } = messageFor(wallet, 'BET', '10.00');
+    await sendWagerMessage(container.sqs, queues.urls.main, message, { groupId: wallet.id });
+
+    consumer(container.submitWager, { principal: principalFor('sqs:restricted', 'provider-b') }).start();
+    const deadLetters = await waitFor(
+      async () => {
+        const messages = await receiveAll(container.sqs, queues.urls.deadLetter);
+        return messages.length > 0 ? messages : undefined;
+      },
+      { description: 'dead letter' },
+    );
+    expect(deadLetters[0]!.MessageAttributes?.reason?.StringValue).toBe('provider_not_allowed');
+    expect(await balanceOf(wallet.id)).toBe('100.00');
+  });
+
   it('moves idempotency conflicts to the DLQ', async () => {
     queues = await createTestQueues(container.sqs);
     const wallet = await openWallet('100.00');
@@ -264,6 +284,7 @@ describe('SQS consumer', () => {
       payload: (await import('../../src/application/wagering/wager-payload')).parseWagerPayload(delivered.data),
       correlationId: newId(),
       source: 'sqs',
+      principal: TRUSTED_INTERNAL_PRINCIPAL,
       inbox: {
         consumerName: 'crash-test',
         messageId: delivered.messageId,

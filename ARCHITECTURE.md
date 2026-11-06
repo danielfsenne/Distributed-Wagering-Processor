@@ -281,6 +281,7 @@ O status HTTP basta para o provedor decidir se reenvia, sem interpretar mensagen
 | Aceita, aguardando referência | **202** (`PENDING_REFERENCE`) | — | Pode reenviar para consultar o status |
 | Rejeição de regra de negócio | **422** com `status` e `failureCode` | — | Não, com a mesma chave |
 | Payload inválido | **400** | `INVALID_PAYLOAD`, `MISSING_IDEMPOTENCY_KEY`, `INVALID_IDEMPOTENCY_KEY`, `INVALID_CURSOR`, `INVALID_LIMIT` | Só depois de corrigir |
+| Provedor fora do escopo do principal | **403** | `PROVIDER_NOT_ALLOWED` | Não |
 | Conflito | **409** | `IDEMPOTENCY_KEY_CONFLICT`, `EXTERNAL_TRANSACTION_CONFLICT`, `WALLET_ALREADY_EXISTS` | Não |
 | Recurso inexistente | **404** | `WALLET_NOT_FOUND`, `TRANSACTION_NOT_FOUND` | Não |
 | Falha transitória (Postgres ou lock) | **503** + `Retry-After` | `TRANSIENT_FAILURE` (`retryable: true`) | **Sim**, com a mesma chave |
@@ -312,7 +313,7 @@ O replay devolve o mesmo status da resposta original: 422 para rejeitada, 202 pa
     | Tipo | Exemplos | Ação |
     |---|---|---|
     | Negócio (terminal) | `REJECTED`, `PENDING_REFERENCE`, replay | **ack** |
-    | Permanente | JSON inválido, payload inválido, conflito de idempotência, `MESSAGE_ID_CONFLICT`, wallet inexistente | **DLQ imediata** com `reason` |
+    | Permanente | JSON inválido, payload inválido, conflito de idempotência, `MESSAGE_ID_CONFLICT`, `PROVIDER_NOT_ALLOWED`, wallet inexistente | **DLQ imediata** com `reason` |
     | Transitório | Postgres fora, timeout de lock, conflitos esgotados | **retry** com `ChangeMessageVisibility` em backoff exponencial (2 s × 2^(n-1), teto de 60 s); depois de `CONSUMER_MAX_ATTEMPTS = 5` recebimentos, **DLQ** com `reason = retries_exhausted` |
   - mover para a DLQ significa `SendMessage` na DLQ (com `reason`, `originalMessageId` e `receiveCount` como atributos) seguido de `DeleteMessage`. Se o processo morrer entre os dois, a mensagem volta e é reenviada à DLQ, e o `MessageDeduplicationId` (o `MessageId` original) evita a duplicata dentro da janela do FIFO.
 - **SIGTERM**: o consumidor para de buscar (aborta o long poll), espera as mensagens em andamento até o timeout e devolve a visibilidade (`VisibilityTimeout = 0`) das que foram recebidas mas não iniciadas, que vão logo para outra instância.
@@ -359,14 +360,16 @@ O replay devolve o mesmo status da resposta original: 422 para rejeitada, 202 pa
 **Não implementei autenticação real.** Ela vale 0 ponto e competiria por tempo com correção, concorrência e idempotência. O ponto de extensão está explícito no código:
 
 - `AuthGuard` global (`APP_GUARD`) com decorator `@Public()`. Health e métricas são públicos.
-- `ProviderIdentityPort` com `resolve(request): Principal` e `assertMayActFor(principal, providerId)`. Hoje ele é atendido por `NoopProviderIdentity`, que devolve um principal anônimo com acesso a todos os provedores.
-- O controller já chama `assertMayActFor` com o `providerId` do payload antes de processar.
+- `ProviderIdentityPort.resolve(request): ProviderPrincipal`, atendido hoje por `NoopProviderIdentity`, que devolve um principal anônimo com acesso a todos os provedores.
+- **A validação da identidade do provedor fica no caso de uso, não na borda.** O `SubmitWagerCommand` exige um `principal`, e o `SubmitWagerTransaction` chama `assertMayActFor(principal, providerId)` antes de qualquer efeito. Assim HTTP e fila passam pela **mesma** regra:
+  - no HTTP, o principal vem do `ProviderIdentityPort`; um provedor fora do escopo recebe `403 PROVIDER_NOT_ALLOWED`. A consulta por `providerId` aplica a mesma checagem;
+  - na fila, tratada como canal interno confiável, o principal é o do consumidor, configurado por `CONSUMER_ALLOWED_PROVIDERS` (padrão `*`). Uma mensagem de provedor fora da lista é erro permanente e vai para a DLQ com `reason = provider_not_allowed`.
 
 **Desenho que eu adotaria:**
 
 1. **Keycloak** no Compose, com um realm `wagering` e um *client* confidencial por provedor (fluxo `client_credentials`). Cada client recebe um *mapper* que coloca o claim `provider_id` no token.
 2. Uma implementação `JwtProviderIdentity` do `ProviderIdentityPort` valida o JWT (`iss`, `aud`, `exp` e assinatura) pelo JWKS do Keycloak, com cache de chaves e rotação. Extrai `sub` e `provider_id` para o `Principal`.
-3. `assertMayActFor` rejeita com 403 quando o `providerId` do payload não é o do token. Essa é a validação de domínio que o enunciado pede manter também para mensagens da fila, que hoje já passam pelas validações de payload.
+3. O `Principal` resultante carrega o `provider_id` do token, e o `assertMayActFor` que já existe no caso de uso passa a rejeitar com 403 qualquer `providerId` diferente, sem mudança no fluxo.
 4. Endpoints administrativos (abertura de wallet, reconciliação) exigiriam um *role* separado (`wallet-admin`).
 5. Nada de tabela de usuários ou hash de senha no serviço.
 

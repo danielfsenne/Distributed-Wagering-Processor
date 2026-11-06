@@ -9,6 +9,7 @@ import {
 import { ApplicationError, TransientError } from '../../application/errors';
 import { sha256Hex } from '../../application/idempotency/payload-hash';
 import type { Logger, Metrics } from '../../application/ports';
+import type { ProviderPrincipal } from '../../application/provider-access';
 import type { SubmitWagerTransaction } from '../../application/wagering/submit-wager-transaction';
 import { DomainError } from '../../domain/shared/domain-error';
 import { runWithLogContext } from '../observability/log-context';
@@ -19,6 +20,7 @@ export interface SqsConsumerOptions {
   queueName: string;
   deadLetterQueueName: string;
   consumerName: string;
+  principal: ProviderPrincipal;
   maxAttempts: number;
   concurrency: number;
   waitTimeSeconds: number;
@@ -137,6 +139,7 @@ export class SqsWagerConsumer {
         const outcome = await this.submitWager.execute({
           idempotencyKey: parsed.idempotencyKey,
           payload: parsed.payload,
+          principal: this.options.principal,
           correlationId: context.correlationId,
           causationId: parsed.messageId,
           source: 'sqs',

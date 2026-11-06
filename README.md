@@ -86,7 +86,7 @@ curl -s -X POST localhost:3000/wagering/transactions \
 
 `REFUND` e `ROLLBACK` exigem `referenceExternalTransactionId`. `WIN` e `LOSS` aceitam essa referência como opcional.
 
-**Status HTTP**: 201 aplicada · 200 replay · 202 aguardando referência · 422 rejeição de negócio (com `failureCode`) · 400 payload inválido · 409 conflito · 404 inexistente · 503 transitório (`Retry-After`). A tabela completa e os códigos de falha estão no [ARCHITECTURE.md](ARCHITECTURE.md#8-regras-de-negócio-e-interpretações-adotadas).
+**Status HTTP**: 201 aplicada · 200 replay · 202 aguardando referência · 422 rejeição de negócio (com `failureCode`) · 400 payload inválido · 403 provedor fora do escopo · 409 conflito · 404 inexistente · 503 transitório (`Retry-After`). A tabela completa e os códigos de falha estão no [ARCHITECTURE.md](ARCHITECTURE.md#8-regras-de-negócio-e-interpretações-adotadas).
 
 ## Enviando pela fila SQS
 
@@ -173,6 +173,7 @@ bun run start:api      # ou start:worker, ou start:all
 | `SQS_TRANSACTIONS_QUEUE` / `SQS_DLQ_QUEUE` / `SQS_EVENTS_QUEUE` | `wager-transactions.fifo` / `wager-transactions-dlq.fifo` / `wagering-events.fifo` |
 | `DB_POOL_MAX` / `DB_LOCK_TIMEOUT_MS` | `20` / `5000` |
 | `CONSUMER_MAX_ATTEMPTS` / `CONSUMER_CONCURRENCY` | `5` / `10` |
+| `CONSUMER_ALLOWED_PROVIDERS` | `*` (lista separada por vírgula) |
 | `CONSUMER_RETRY_BASE_DELAY_SECONDS` / `CONSUMER_RETRY_MAX_DELAY_SECONDS` | `2` / `60` |
 | `OUTBOX_BATCH_SIZE` / `OUTBOX_INTERVAL_MS` | `50` / `500` |
 | `REFERENCE_MAX_ATTEMPTS` / `REFERENCE_BASE_DELAY_MS` / `REFERENCE_MAX_DELAY_MS` | `12` / `1000` / `300000` |
@@ -197,4 +198,4 @@ docker/                init do Postgres e criação das filas no LocalStack
 
 ## Autenticação
 
-Não implementei autenticação, por decisão documentada (ela não pontua e competiria por tempo com correção e concorrência). O ponto de extensão está no código: um `AuthGuard` global no-op e um `ProviderIdentityPort` que já é chamado com o `providerId` de cada requisição. O desenho com Keycloak (OIDC `client_credentials` por provedor, validação de JWT via JWKS e claim `provider_id`) está na [seção 13 do ARCHITECTURE.md](ARCHITECTURE.md#13-autenticação-decisão).
+Não implementei autenticação, por decisão documentada (ela não pontua e competiria por tempo com correção e concorrência). O ponto de extensão está no código: um `AuthGuard` global no-op e um `ProviderIdentityPort`. A validação do provedor fica no caso de uso e vale tanto para o HTTP quanto para a fila (`CONSUMER_ALLOWED_PROVIDERS`). O desenho com Keycloak (OIDC `client_credentials` por provedor, validação de JWT via JWKS e claim `provider_id`) está na [seção 13 do ARCHITECTURE.md](ARCHITECTURE.md#13-autenticação-decisão).

@@ -1,3 +1,4 @@
+import { TRUSTED_INTERNAL_PRINCIPAL } from '../../src/application/provider-access';
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { MessageIdConflictError } from '../../src/application/errors';
 import type { TransactionScope, UnitOfWork } from '../../src/application/ports';
@@ -83,6 +84,7 @@ describe('atomicity of wallet, ledger, inbox and outbox', () => {
       payload: parseWagerPayload(body),
       correlationId: 'corr-atomic',
       source: 'http',
+      principal: TRUSTED_INTERNAL_PRINCIPAL,
     });
 
     expect(outcome.status).toBe(WagerTransactionStatus.Processed);
@@ -118,6 +120,7 @@ describe('atomicity of wallet, ledger, inbox and outbox', () => {
         payload: parseWagerPayload(body),
         correlationId: newId(),
         source: 'http',
+        principal: TRUSTED_INTERNAL_PRINCIPAL,
       }),
     ).rejects.toThrow('simulated crash');
 
@@ -149,6 +152,7 @@ describe('atomicity of wallet, ledger, inbox and outbox', () => {
         payload: parseWagerPayload(body),
         correlationId: newId(),
         source: 'http',
+        principal: TRUSTED_INTERNAL_PRINCIPAL,
       }),
     ).rejects.toThrow('simulated crash');
 
@@ -160,6 +164,7 @@ describe('atomicity of wallet, ledger, inbox and outbox', () => {
       payload: parseWagerPayload(body),
       correlationId: newId(),
       source: 'http',
+      principal: TRUSTED_INTERNAL_PRINCIPAL,
     });
     expect(retried).toMatchObject({ status: 'PROCESSED', idempotentReplay: false });
     expect(retried.balance.amount).toBe('70.00');
@@ -174,6 +179,7 @@ describe('atomicity of wallet, ledger, inbox and outbox', () => {
       payload: parseWagerPayload(body),
       correlationId: newId(),
       source: 'sqs' as const,
+      principal: TRUSTED_INTERNAL_PRINCIPAL,
       inbox: { consumerName: 'atomicity-test', messageId, messageHash: 'f'.repeat(64) },
     };
 
@@ -207,6 +213,7 @@ describe('atomicity of wallet, ledger, inbox and outbox', () => {
       payload: parseWagerPayload(first),
       correlationId: newId(),
       source: 'sqs',
+      principal: TRUSTED_INTERNAL_PRINCIPAL,
       inbox,
     });
     await expect(
@@ -215,6 +222,7 @@ describe('atomicity of wallet, ledger, inbox and outbox', () => {
         payload: parseWagerPayload(second),
         correlationId: newId(),
         source: 'sqs',
+        principal: TRUSTED_INTERNAL_PRINCIPAL,
         inbox,
       }),
     ).rejects.toThrow(MessageIdConflictError);
@@ -242,6 +250,7 @@ describe('atomicity of wallet, ledger, inbox and outbox', () => {
         payload: parseWagerPayload(body),
         correlationId: newId(),
         source: 'sqs',
+        principal: TRUSTED_INTERNAL_PRINCIPAL,
         inbox: { consumerName: 'atomicity-test', messageId, messageHash: 'f'.repeat(64) },
       }),
     ).rejects.toThrow();

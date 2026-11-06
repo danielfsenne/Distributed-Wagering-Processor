@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { newId } from '../../src/domain/shared/id';
+import { createHttpApp } from '../../src/interfaces/http/http-app';
 import { type TestHttpApp, startTestHttpApp } from '../support/app';
 import { type WagerBody, assertLedgerMatchesBalance, keyFor, wagerBody } from '../support/fixtures';
 
@@ -335,6 +336,41 @@ describe('HTTP API', () => {
       );
       expect(byExternal.body.id).toBe(created.body.transactionId);
       expect((await call('GET', `/providers/x/wagering/transactions/nope`)).status).toBe(404);
+    });
+  });
+
+  describe('provider identity', () => {
+    it('applies the provider scope of the resolved principal to submissions and lookups', async () => {
+      const app = await createHttpApp(http.container, {
+        resolve: async () => ({ subject: 'provider-b-client', providerIds: ['provider-b'] }),
+      });
+      await app.listen(0);
+      const baseUrl = `http://127.0.0.1:${(app.getHttpServer().address() as { port: number }).port}`;
+      try {
+        const wallet = await openWallet('100.00');
+        const body = wagerBody(wallet, 'BET', '10.00');
+        const forbidden = await fetch(`${baseUrl}/wagering/transactions`, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json', 'Idempotency-Key': keyFor(body) },
+          body: JSON.stringify(body),
+        });
+        expect(forbidden.status).toBe(403);
+        expect(((await forbidden.json()) as { error: { code: string } }).error.code).toBe('PROVIDER_NOT_ALLOWED');
+
+        const lookup = await fetch(`${baseUrl}/providers/provider-a/wagering/transactions/${body.externalTransactionId}`);
+        expect(lookup.status).toBe(403);
+
+        const allowed = wagerBody(wallet, 'BET', '10.00', { providerId: 'provider-b' });
+        const accepted = await fetch(`${baseUrl}/wagering/transactions`, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json', 'Idempotency-Key': keyFor(allowed) },
+          body: JSON.stringify(allowed),
+        });
+        expect(accepted.status).toBe(201);
+        expect((await call('GET', `/wallets/${wallet.id}`)).body.balance.amount).toBe('90.00');
+      } finally {
+        await app.close();
+      }
     });
   });
 

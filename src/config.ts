@@ -18,6 +18,7 @@ export interface AppConfig {
   };
   consumer: {
     name: string;
+    allowedProviders: string;
     maxAttempts: number;
     concurrency: number;
     waitTimeSeconds: number;
@@ -70,6 +71,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env, mode?: AppMode)
     },
     consumer: {
       name: env.CONSUMER_NAME ?? 'wager-transactions-consumer',
+      allowedProviders: env.CONSUMER_ALLOWED_PROVIDERS ?? '*',
       maxAttempts: int(env, 'CONSUMER_MAX_ATTEMPTS', 5),
       concurrency: int(env, 'CONSUMER_CONCURRENCY', 10),
       waitTimeSeconds: int(env, 'CONSUMER_WAIT_TIME_SECONDS', 10),

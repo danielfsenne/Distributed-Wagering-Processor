@@ -1,3 +1,4 @@
+import { TRUSTED_INTERNAL_PRINCIPAL } from '../../src/application/provider-access';
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { ResolvePendingReferences } from '../../src/application/wagering/resolve-pending-references';
 import { parseWagerPayload } from '../../src/application/wagering/wager-payload';
@@ -35,6 +36,7 @@ function submit(body: ReturnType<typeof wagerBody>) {
     payload: parseWagerPayload(body),
     correlationId: newId(),
     source: 'http',
+    principal: TRUSTED_INTERNAL_PRINCIPAL,
   });
 }
 

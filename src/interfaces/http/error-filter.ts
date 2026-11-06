@@ -16,6 +16,7 @@ export interface ErrorBody {
 
 const STATUS_BY_CATEGORY = {
   validation: 400,
+  forbidden: 403,
   'not-found': 404,
   conflict: 409,
   transient: 503,

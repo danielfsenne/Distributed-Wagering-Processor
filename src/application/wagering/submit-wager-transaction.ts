@@ -8,6 +8,7 @@ import {
   NotFoundError,
 } from '../errors';
 import type { Clock, Logger, Metrics, TransactionScope, TransactionSource, UnitOfWork } from '../ports';
+import { type ProviderPrincipal, assertMayActFor } from '../provider-access';
 import { withTransactionRetry } from '../transaction-retry';
 import { toOutcome, type WagerOutcome } from './wager-outcome';
 import { type WagerPayload, wagerPayloadHash } from './wager-payload';
@@ -22,6 +23,7 @@ export interface InboxContext {
 export interface SubmitWagerCommand {
   idempotencyKey: string;
   payload: WagerPayload;
+  principal: ProviderPrincipal;
   correlationId: string;
   causationId?: string | undefined;
   source: TransactionSource;
@@ -39,6 +41,7 @@ export class SubmitWagerTransaction {
 
   async execute(command: SubmitWagerCommand): Promise<WagerOutcome> {
     const startedAt = performance.now();
+    assertMayActFor(command.principal, command.payload.providerId);
     const hash = wagerPayloadHash(command.payload);
     const outcome = await withTransactionRetry(
       () => this.unitOfWork.run((scope) => this.process(scope, command, hash)),
