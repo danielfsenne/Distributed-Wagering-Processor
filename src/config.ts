@@ -3,6 +3,7 @@ export type AppMode = 'api' | 'worker' | 'all';
 export interface AppConfig {
   mode: AppMode;
   port: number;
+  opsPort: number;
   databaseUrl: string;
   dbPoolMax: number;
   lockTimeoutMs: number;
@@ -54,6 +55,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env, mode?: AppMode)
   return {
     mode: resolvedMode,
     port: int(env, 'PORT', 3000),
+    opsPort: int(env, 'OPS_PORT', 9100),
     databaseUrl: env.DATABASE_URL ?? 'postgres://wagering:wagering@localhost:55432/wagering',
     dbPoolMax: int(env, 'DB_POOL_MAX', 20),
     lockTimeoutMs: int(env, 'DB_LOCK_TIMEOUT_MS', 5_000),

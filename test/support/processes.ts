@@ -44,6 +44,7 @@ export async function spawnApp(
       ...process.env,
       DATABASE_URL: TEST_DATABASE_URL,
       PORT: String(port),
+      OPS_PORT: String(port),
       LOG_LEVEL: 'info',
       DB_POOL_MAX: '10',
       SQS_TRANSACTIONS_QUEUE: 'test-wager-transactions.fifo',

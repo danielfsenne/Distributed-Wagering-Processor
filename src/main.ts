@@ -3,6 +3,7 @@ import type { INestApplication } from '@nestjs/common';
 import { type AppMode, loadConfig } from './config';
 import { createContainer } from './container';
 import { createHttpApp } from './interfaces/http/http-app';
+import { startOpsServer } from './interfaces/http/ops-server';
 import { type Worker, startWorker } from './worker';
 
 async function main(): Promise<void> {
@@ -19,8 +20,13 @@ async function main(): Promise<void> {
   }
 
   let worker: Worker | undefined;
+  let ops: ReturnType<typeof startOpsServer> | undefined;
   if (config.mode === 'worker' || config.mode === 'all') {
     worker = startWorker(container);
+  }
+  if (config.mode === 'worker') {
+    ops = startOpsServer(container, config.opsPort);
+    logger.info('ops server listening', { port: config.opsPort });
   }
 
   let shuttingDown = false;
@@ -35,6 +41,7 @@ async function main(): Promise<void> {
     deadline.unref();
     try {
       await http?.close();
+      ops?.stop(true);
       await worker?.stop(Math.max(1_000, config.shutdownTimeoutMs - 5_000));
       await container.close();
       logger.info('shutdown complete');
