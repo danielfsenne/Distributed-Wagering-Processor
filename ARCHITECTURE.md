@@ -393,7 +393,11 @@ Os testes não substituem Postgres nem SQS por mocks: integração e concorrênc
 | 50 envios paralelos da mesma aposta; cenário 100/80/80; wallets em paralelo; sem lock global | `test/concurrency/hot-wallet.test.ts` |
 | ≥ 3 processos; worker morto depois do commit e antes do ack; SIGKILL e reinício com consistência | `test/concurrency/multi-process.test.ts`, `sqs-consumer.test.ts` |
 
-A invariante `wallet.balance == saldo reconstruído pelo ledger` (e `max(wallet_version) == wallet.version`) é verificada por `assertLedgerMatchesBalance` ao final dos cenários. Também é garantida pelos triggers diferidos em cada commit.
+A invariante `wallet.balance == saldo reconstruído pelo ledger` (e `wallet.version == última versão do ledger`) é verificada em três níveis:
+
+1. `assertLedgerMatchesBalance` ao final de cada cenário que movimenta saldo;
+2. **um hook global** (`test/support/global-invariants.ts`, carregado com `--preload` nas suítes de integração, concorrência e resiliência) que, ao final da execução, confere **todas as wallets criadas durante o run** e falha a suíte se alguma divergir. As únicas exceções são as wallets corrompidas de propósito pelo teste de reconciliação, registradas explicitamente com `excludeFromGlobalInvariant`;
+3. os triggers diferidos, que recusam qualquer commit que quebre a invariante.
 
 Os testes usam ids aleatórios (UUID v7) e **filas exclusivas por teste**, criadas e apagadas pelo próprio teste. Por isso não dependem de limpeza do banco, que o próprio schema impede para o ledger, e podem rodar repetidamente. A suíte foi executada várias vezes seguidas sem falhas intermitentes.
 

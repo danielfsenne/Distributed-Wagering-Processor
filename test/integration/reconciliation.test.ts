@@ -6,6 +6,7 @@ import { newId } from '../../src/domain/shared/id';
 import { Money } from '../../src/domain/shared/money';
 import { PrometheusMetrics } from '../../src/infrastructure/observability/prometheus-metrics';
 import { createTestContainer } from '../support/app';
+import { excludeFromGlobalInvariant } from '../support/invariants';
 
 let container: Container;
 
@@ -46,6 +47,7 @@ async function openWallet(amount: string) {
 }
 
 async function corruptStoredBalance(walletId: string, balance: string) {
+  excludeFromGlobalInvariant(walletId);
   await container.orm.em.fork().transactional(async (em) => {
     await em.execute(`SET LOCAL session_replication_role = replica`);
     await em.execute(`UPDATE wallets SET balance = ? WHERE id = ?`, [balance, walletId]);
