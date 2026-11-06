@@ -14,6 +14,7 @@
     "test:unit": "bun test test/unit",
     "test:integration": "bun test --preload ./test/support/global-invariants.ts --timeout 60000 test/integration",
     "test:concurrency": "bun test --preload ./test/support/global-invariants.ts --timeout 120000 test/concurrency",
+    "test:resilience": "bun test --preload ./test/support/global-invariants.ts --timeout 300000 test/resilience",
     "test:all": "bun run test:unit && bun run test:integration && bun run test:concurrency",
     "test:load": "bun test/load/load-test.ts"
   },

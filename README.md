@@ -14,7 +14,7 @@ Serviço financeiro distribuído que processa transações de apostas (`BET`, `W
 - **Idempotência persistente**: `Idempotency-Key` com `UNIQUE` no banco, hash SHA-256 do JSON canônico do payload, replay com o saldo observado na época e 409 para payload divergente. Inbox `(consumerName, messageId)` no SQS.
 - **Transactional outbox**: eventos gravados na mesma transação SQL do efeito financeiro, publicados por vários workers com `FOR UPDATE SKIP LOCKED` e `SendMessageBatch`.
 - **Mensageria resiliente**: ack só depois do commit; erros de negócio, transitórios e permanentes tratados de formas diferentes; backoff, DLQ e shutdown gracioso no `SIGTERM`.
-- **Testes reais**: 225 testes. Integração e concorrência rodam contra Postgres e LocalStack em containers, inclusive com 3 processos independentes, `SIGKILL` no meio do fluxo e reinício.
+- **Testes reais**: 227 testes. Integração e concorrência rodam contra Postgres e LocalStack em containers, inclusive com 3 processos independentes, `SIGKILL` no meio do fluxo e reinício.
 
 ## Requisitos
 
@@ -128,9 +128,14 @@ docker compose up -d postgres localstack
 bun run test               # unitários (domínio, Money, regras, hash)
 bun run test:integration   # migrations, constraints, API, atomicidade, inbox, outbox, DLQ, referências
 bun run test:concurrency   # corridas reais, 3+ processos, SIGKILL e reinício
-bun run test:all           # tudo, em sequência
+bun run test:all           # unitários, integração e concorrência, em sequência
+bun run test:resilience    # derruba Postgres e LocalStack de verdade (docker compose stop/pause)
 bun run typecheck
 ```
+
+As suítes de integração, concorrência e resiliência verificam ao final que **todas** as wallets criadas durante a execução têm `saldo == ledger`.
+
+O `test:resilience` fica fora do `test:all` porque para o container do Postgres e congela o do LocalStack durante a execução. Todos os serviços são restaurados ao final, mesmo em caso de falha.
 
 ## Teste de carga
 
@@ -170,6 +175,7 @@ bun run start:api      # ou start:worker, ou start:all
 | `DATABASE_URL` | `postgres://wagering:wagering@localhost:55432/wagering` |
 | `PORT` / `OPS_PORT` | `3000` / `9100` |
 | `AWS_ENDPOINT_URL` / `AWS_REGION` | `http://localhost:4566` / `us-east-1` |
+| `SQS_REQUEST_TIMEOUT_MS` / `SQS_CONNECTION_TIMEOUT_MS` | `25000` / `3000` |
 | `SQS_TRANSACTIONS_QUEUE` / `SQS_DLQ_QUEUE` / `SQS_EVENTS_QUEUE` | `wager-transactions.fifo` / `wager-transactions-dlq.fifo` / `wagering-events.fifo` |
 | `DB_POOL_MAX` / `DB_LOCK_TIMEOUT_MS` | `20` / `5000` |
 | `CONSUMER_MAX_ATTEMPTS` / `CONSUMER_CONCURRENCY` | `5` / `10` |

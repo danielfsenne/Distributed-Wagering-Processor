@@ -331,6 +331,7 @@ O replay devolve o mesmo status da resposta original: 422 para rejeitada, 202 pa
   - *publicou no SQS e morreu antes do commit da marcação*: o lock é liberado pelo rollback, outra instância republica **com o mesmo `eventId`** e o mesmo payload. É at-least-once: o consumidor deduplica pelo `eventId`, e o FIFO deduplica na janela de 5 min;
   - *SQS indisponível*: retry com backoff, sem perder eventos.
 - **Garantia oferecida**: nenhum evento confirmado se perde, e a duplicação é limitada às janelas de crash. Não é "exactly once"; o contrato com os consumidores é idempotência por `eventId`.
+- **Broker fora do ar**: o cliente SQS tem timeout de conexão (3 s) e de requisição (25 s, acima do long poll máximo de 20 s), com `throwOnRequestTimeout`. Se uma chamada de lote falha por inteiro, os lotes restantes são reagendados na hora, sem esperar um timeout para cada lote.
 - **Trade-off**: o lote fica travado enquanto o publisher chama o SQS (transação aberta durante I/O de rede). A alternativa seria um lease em coluna (`locked_until`), que libera a conexão mas exige ajustar bem o tempo do lease. Com lotes pequenos e timeouts do cliente SQS, o lock por linha com `SKIP LOCKED` ficou mais simples e já resolve publishers concorrentes.
 - **Ordem**: dentro de um lote, a ordem é por `sequence`. Entre publishers concorrentes, eventos do mesmo agregado podem sair fora de ordem, então os consumidores devem usar `walletVersion` (presente em `WalletBalanceChanged`) para ordenar.
 
@@ -392,6 +393,14 @@ Os testes não substituem Postgres nem SQS por mocks: integração e concorrênc
 | Validação do provedor no HTTP (403) e na fila (DLQ) | `test/integration/http-api.test.ts`, `sqs-consumer.test.ts`, `test/unit/provider-access.test.ts` |
 | 50 envios paralelos da mesma aposta; cenário 100/80/80; wallets em paralelo; sem lock global | `test/concurrency/hot-wallet.test.ts` |
 | ≥ 3 processos; worker morto depois do commit e antes do ack; SIGKILL e reinício com consistência | `test/concurrency/multi-process.test.ts`, `sqs-consumer.test.ts` |
+| Postgres e SQS indisponíveis de verdade (`docker compose stop postgres`, `pause localstack`) | `test/resilience/infrastructure-outage.test.ts` |
+
+**Resiliência a indisponibilidade real** (`bun run test:resilience`):
+
+- *Postgres parado*: a API responde `503 TRANSIENT_FAILURE` com `Retry-After`; `/health/ready` responde 503 com `postgres: down`, e `/health/live` segue 200. A mensagem que chega pela fila nesse período não vai para a DLQ (fica em retry com backoff). Quando o banco volta, a mesma requisição HTTP é aplicada (201), o reenvio vira replay (200), a mensagem é aplicada uma única vez e a reconciliação fecha.
+- *LocalStack congelado*: o caminho financeiro continua disponível (201), já que a outbox desacopla a publicação; o readiness acusa `sqs: down`, e o publisher registra a falha e o backoff sem perder o evento. Quando o broker volta, o evento é publicado e o consumidor volta a processar sem precisar reiniciar.
+
+Esse teste revelou dois defeitos, corrigidos: o cliente SQS não tinha timeout efetivo (o SDK apenas avisava), o que deixaria o publisher travado segurando os locks do lote; e uma falha ao resolver a URL da fila escapava do tratamento de retry do publisher.
 
 A invariante `wallet.balance == saldo reconstruído pelo ledger` (e `wallet.version == última versão do ledger`) é verificada em três níveis:
 
