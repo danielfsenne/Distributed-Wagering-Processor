@@ -1,5 +1,6 @@
 import {
   CreateQueueCommand,
+  DeleteMessageBatchCommand,
   DeleteQueueCommand,
   GetQueueAttributesCommand,
   type Message,
@@ -78,6 +79,12 @@ export async function receiveAll(sqs: SQSClient, queueUrl: string, waitSeconds =
     );
     if (Messages.length === 0) return messages;
     messages.push(...Messages);
+    await sqs.send(
+      new DeleteMessageBatchCommand({
+        QueueUrl: queueUrl,
+        Entries: Messages.map((message, index) => ({ Id: String(index), ReceiptHandle: message.ReceiptHandle })),
+      }),
+    );
   }
 }
 

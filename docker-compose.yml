@@ -21,6 +21,7 @@ x-app: &app
 services:
   postgres:
     image: postgres:17-alpine
+    command: ["postgres", "-c", "max_connections=300"]
     environment:
       POSTGRES_USER: wagering
       POSTGRES_PASSWORD: wagering
