@@ -353,7 +353,7 @@ O replay devolve o mesmo status da resposta original: 422 para rejeitada, 202 pa
 | `wagering_reconciliation_divergences_total` | counter |
 
 - **Health**: `/health/live` (processo vivo) e `/health/ready` (Postgres e SQS alcançáveis, timeout de 2 s, responde 503 se algum estiver fora). Os dois são abertos. O Compose usa o `ready` como healthcheck da API e dos workers.
-- **Reconciliação** (`POST /wallets/:id/reconciliation`): com a wallet em `FOR SHARE`, que bloqueia escritas concorrentes durante a leitura, compara o saldo armazenado com a soma do ledger. Divergências **não são corrigidas**: são logadas em `error`, contadas em métrica e sinalizadas com `consistent: false`.
+- **Reconciliação** (`POST /wallets/:id/reconciliation`): com a wallet em `FOR SHARE`, que bloqueia escritas concorrentes durante a leitura, compara o saldo armazenado com a soma do ledger. Divergências **não são corrigidas**: são logadas em `error`, contadas em métrica e sinalizadas com `consistent: false`. Como os triggers impedem criar uma divergência pelo caminho normal, o teste desliga os triggers apenas na sua sessão (`session_replication_role = replica`) para corromper o saldo e exercitar esse caminho.
 
 ## 13. Autenticação: decisão
 
@@ -388,6 +388,8 @@ Os testes não substituem Postgres nem SQS por mocks: integração e concorrênc
 | Inbox e redelivery; retry e DLQ; SIGTERM | `test/integration/sqs-consumer.test.ts` |
 | Publishers concorrentes; crash antes e depois de publicar | `test/integration/outbox.test.ts` |
 | Referências fora de ordem; resolvedores concorrentes | `test/integration/pending-references.test.ts` |
+| Reconciliação: divergência sinalizada, logada e contada em métrica, sem correção silenciosa | `test/integration/reconciliation.test.ts` |
+| Validação do provedor no HTTP (403) e na fila (DLQ) | `test/integration/http-api.test.ts`, `sqs-consumer.test.ts`, `test/unit/provider-access.test.ts` |
 | 50 envios paralelos da mesma aposta; cenário 100/80/80; wallets em paralelo; sem lock global | `test/concurrency/hot-wallet.test.ts` |
 | ≥ 3 processos; worker morto depois do commit e antes do ack; SIGKILL e reinício com consistência | `test/concurrency/multi-process.test.ts`, `sqs-consumer.test.ts` |
 

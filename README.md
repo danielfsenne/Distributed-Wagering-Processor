@@ -14,7 +14,7 @@ Serviço financeiro distribuído que processa transações de apostas (`BET`, `W
 - **Idempotência persistente**: `Idempotency-Key` com `UNIQUE` no banco, hash SHA-256 do JSON canônico do payload, replay com o saldo observado na época e 409 para payload divergente. Inbox `(consumerName, messageId)` no SQS.
 - **Transactional outbox**: eventos gravados na mesma transação SQL do efeito financeiro, publicados por vários workers com `FOR UPDATE SKIP LOCKED` e `SendMessageBatch`.
 - **Mensageria resiliente**: ack só depois do commit; erros de negócio, transitórios e permanentes tratados de formas diferentes; backoff, DLQ e shutdown gracioso no `SIGTERM`.
-- **Testes reais**: 214 testes. Integração e concorrência rodam contra Postgres e LocalStack em containers, inclusive com 3 processos independentes, `SIGKILL` no meio do fluxo e reinício.
+- **Testes reais**: 225 testes. Integração e concorrência rodam contra Postgres e LocalStack em containers, inclusive com 3 processos independentes, `SIGKILL` no meio do fluxo e reinício.
 
 ## Requisitos
 
