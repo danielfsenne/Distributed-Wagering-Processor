@@ -1,4 +1,4 @@
-import { WalletBalanceChanged } from '../../domain/messaging/events';
+import { WagerTransactionProcessed, WalletBalanceChanged } from '../../domain/messaging/events';
 import { OutboxMessage } from '../../domain/messaging/outbox-message';
 import { DomainError } from '../../domain/shared/domain-error';
 import { newId } from '../../domain/shared/id';
@@ -92,14 +92,10 @@ export class OpenWallet {
         if (opening && openingEntry) {
           await scope.transactions.insert(opening);
           await scope.ledger.append(openingEntry);
+          const context = { correlationId: command.correlationId, causationId: opening.id, occurredAt: now };
           await scope.outbox.enqueue([
-            OutboxMessage.enqueue(
-              WalletBalanceChanged.from(wallet, openingEntry, {
-                correlationId: command.correlationId,
-                causationId: opening.id,
-                occurredAt: now,
-              }),
-            ),
+            OutboxMessage.enqueue(WagerTransactionProcessed.from(opening, context)),
+            OutboxMessage.enqueue(WalletBalanceChanged.from(wallet, openingEntry, context)),
           ]);
         }
         return wallet;

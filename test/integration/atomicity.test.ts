@@ -258,5 +258,30 @@ describe('atomicity of wallet, ledger, inbox and outbox', () => {
     );
     expect(opening).toEqual({ kind: 'OPENING', status: 'PROCESSED', provider_id: 'internal' });
     await assertLedgerMatchesBalance(container.orm, wallet.id);
+
+    const events = await container.orm.em.fork().execute<
+      Array<{ event_type: string; payload: { data: { kind?: string; balance?: { amount: string; currency: string } } } }>
+    >(
+      `SELECT event_type, payload FROM outbox_messages
+        WHERE payload->'data'->>'walletId' = ? ORDER BY sequence`,
+      [wallet.id],
+    );
+    expect(events.map((event) => event.event_type)).toEqual(['WagerTransactionProcessed', 'WalletBalanceChanged']);
+    expect(events[0]!.payload.data.kind).toBe('OPENING');
+    expect(events[0]!.payload.data.balance).toEqual({ amount: '250.00', currency: 'BRL' });
+  });
+
+  it('opens a zero balance wallet without OPENING transaction or events', async () => {
+    const wallet = await openWallet('0.00');
+    expect(
+      await countRows(container.orm, 'SELECT COUNT(*) AS count FROM wager_transactions WHERE wallet_id = ?', [wallet.id]),
+    ).toBe(0);
+    expect(
+      await countRows(
+        container.orm,
+        `SELECT COUNT(*) AS count FROM outbox_messages WHERE payload->'data'->>'walletId' = ?`,
+        [wallet.id],
+      ),
+    ).toBe(0);
   });
 });
