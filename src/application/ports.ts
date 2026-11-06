@@ -70,7 +70,7 @@ export interface ClaimedOutboxMessage {
 export interface OutboxRepository {
   enqueue(messages: OutboxMessage[]): Promise<void>;
   claimDue(now: Date, limit: number): Promise<ClaimedOutboxMessage[]>;
-  markPublished(message: OutboxMessage): Promise<void>;
+  markPublished(messages: OutboxMessage[], at: Date): Promise<void>;
   scheduleRetry(message: OutboxMessage, error: string): Promise<void>;
   stats(now: Date): Promise<{ pending: number; oldestPendingAgeSeconds: number }>;
 }
@@ -96,8 +96,14 @@ export interface PublishableEvent {
   payload: Readonly<Record<string, unknown>>;
 }
 
+export interface PublishFailure {
+  id: string;
+  error: string;
+}
+
 export interface EventPublisher {
   publish(event: PublishableEvent): Promise<void>;
+  publishAll?(events: PublishableEvent[]): Promise<PublishFailure[]>;
 }
 
 export type TransactionSource = 'http' | 'sqs' | 'reference-worker';
