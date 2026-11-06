@@ -58,6 +58,18 @@ export class ExternalTransactionConflictError extends ApplicationError {
   }
 }
 
+export class MessageIdConflictError extends ApplicationError {
+  readonly code = 'MESSAGE_ID_CONFLICT';
+  readonly category = 'conflict';
+
+  constructor(
+    readonly consumerName: string,
+    readonly messageId: string,
+  ) {
+    super(`Message ${messageId} was already consumed by ${consumerName} for another transaction`);
+  }
+}
+
 export class WalletAlreadyExistsError extends ApplicationError {
   readonly code = 'WALLET_ALREADY_EXISTS';
   readonly category = 'conflict';

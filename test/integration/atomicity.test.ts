@@ -1,4 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
+import { MessageIdConflictError } from '../../src/application/errors';
 import type { TransactionScope, UnitOfWork } from '../../src/application/ports';
 import { SubmitWagerTransaction } from '../../src/application/wagering/submit-wager-transaction';
 import { parseWagerPayload } from '../../src/application/wagering/wager-payload';
@@ -192,6 +193,32 @@ describe('atomicity of wallet, ledger, inbox and outbox', () => {
         first.transactionId,
       ]),
     ).toBe(1);
+  });
+
+  it('treats a reused message id carrying another transaction as conflict', async () => {
+    const wallet = await openWallet('100.00');
+    const messageId = `msg-${newId()}`;
+    const inbox = { consumerName: 'atomicity-test', messageId, messageHash: 'f'.repeat(64) };
+    const first = wagerBody(wallet, 'BET', '10.00');
+    const second = wagerBody(wallet, 'BET', '20.00');
+
+    await container.submitWager.execute({
+      idempotencyKey: keyFor(first),
+      payload: parseWagerPayload(first),
+      correlationId: newId(),
+      source: 'sqs',
+      inbox,
+    });
+    await expect(
+      container.submitWager.execute({
+        idempotencyKey: keyFor(second),
+        payload: parseWagerPayload(second),
+        correlationId: newId(),
+        source: 'sqs',
+        inbox,
+      }),
+    ).rejects.toThrow(MessageIdConflictError);
+    expect((await container.queries.getWallet(wallet.id)).balance.amount).toBe('90.00');
   });
 
   it('does not keep an inbox entry when processing fails', async () => {

@@ -4,6 +4,7 @@ import { WagerTransaction } from '../../domain/wagering/wager-transaction';
 import {
   ExternalTransactionConflictError,
   IdempotencyConflictError,
+  MessageIdConflictError,
   NotFoundError,
 } from '../errors';
 import type { Clock, Logger, Metrics, TransactionScope, TransactionSource, UnitOfWork } from '../ports';
@@ -82,9 +83,10 @@ export class SubmitWagerTransaction {
     if (inboxMessage && !(await scope.inbox.tryReceive(inboxMessage))) {
       this.metrics.duplicateDetected('inbox');
       const previous = await scope.transactions.findByIdempotencyKey(idempotencyKey);
-      if (previous) {
-        return this.replay(scope, previous, hash);
+      if (!previous) {
+        throw new MessageIdConflictError(inboxMessage.consumerName, inboxMessage.messageId);
       }
+      return this.replay(scope, previous, hash);
     }
 
     const wallet = await scope.wallets.lockById(payload.walletId);
