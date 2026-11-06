@@ -10,6 +10,8 @@ export interface AppConfig {
   aws: {
     endpoint: string | undefined;
     region: string;
+    requestTimeoutMs: number;
+    connectionTimeoutMs: number;
   };
   queues: {
     transactions: string;
@@ -63,6 +65,8 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env, mode?: AppMode)
     aws: {
       endpoint: env.AWS_ENDPOINT_URL ?? 'http://localhost:4566',
       region: env.AWS_REGION ?? 'us-east-1',
+      requestTimeoutMs: int(env, 'SQS_REQUEST_TIMEOUT_MS', 25_000),
+      connectionTimeoutMs: int(env, 'SQS_CONNECTION_TIMEOUT_MS', 3_000),
     },
     queues: {
       transactions: env.SQS_TRANSACTIONS_QUEUE ?? 'wager-transactions.fifo',

@@ -37,7 +37,13 @@ export class SqsEventPublisher implements EventPublisher {
   }
 
   async publishAll(events: PublishableEvent[]): Promise<PublishFailure[]> {
-    const queueUrl = await this.queues.resolve(this.queueName);
+    let queueUrl: string;
+    try {
+      queueUrl = await this.queues.resolve(this.queueName);
+    } catch (error) {
+      const message = (error as Error).message;
+      return events.map((event) => ({ id: event.id, error: message }));
+    }
     const failures: PublishFailure[] = [];
     for (let start = 0; start < events.length; start += SQS_BATCH_LIMIT) {
       const chunk = events.slice(start, start + SQS_BATCH_LIMIT);
@@ -59,7 +65,9 @@ export class SqsEventPublisher implements EventPublisher {
           if (event) failures.push({ id: event.id, error: `${failed.Code}: ${failed.Message ?? ''}` });
         }
       } catch (error) {
-        failures.push(...chunk.map((event) => ({ id: event.id, error: (error as Error).message })));
+        const message = (error as Error).message;
+        failures.push(...events.slice(start).map((event) => ({ id: event.id, error: message })));
+        break;
       }
     }
     return failures;

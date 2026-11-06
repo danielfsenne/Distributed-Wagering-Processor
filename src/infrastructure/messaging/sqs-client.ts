@@ -4,12 +4,19 @@ import { TransientError } from '../../application/errors';
 export interface SqsSettings {
   endpoint: string | undefined;
   region: string;
+  requestTimeoutMs: number;
+  connectionTimeoutMs: number;
 }
 
 export function createSqsClient(settings: SqsSettings): SQSClient {
   return new SQSClient({
     region: settings.region,
     ...(settings.endpoint ? { endpoint: settings.endpoint } : {}),
+    requestHandler: {
+      requestTimeout: settings.requestTimeoutMs,
+      connectionTimeout: settings.connectionTimeoutMs,
+      throwOnRequestTimeout: true,
+    },
     credentials: {
       accessKeyId: process.env.AWS_ACCESS_KEY_ID ?? 'test',
       secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY ?? 'test',
