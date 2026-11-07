@@ -1,6 +1,7 @@
 import 'reflect-metadata';
 import { type INestApplication, Module, type DynamicModule } from '@nestjs/common';
 import { APP_GUARD, NestFactory } from '@nestjs/core';
+import { SwaggerModule } from '@nestjs/swagger';
 import type { NextFunction, Request, Response } from 'express';
 import { newId } from '../../domain/shared/id';
 import type { Container } from '../../container';
@@ -8,6 +9,7 @@ import { runWithLogContext } from '../../infrastructure/observability/log-contex
 import { AuthGuard, NoopProviderIdentity, type ProviderIdentityPort } from './auth';
 import { HealthController, WageringController, WalletsController } from './controllers';
 import { ErrorFilter } from './error-filter';
+import { openApiDocument } from './openapi';
 import { CONTAINER, PROVIDER_IDENTITY } from './tokens';
 
 const CORRELATION_HEADER = 'x-correlation-id';
@@ -55,5 +57,9 @@ export async function createHttpApp(
     });
   });
   app.useGlobalFilters(new ErrorFilter(container.logger));
+  SwaggerModule.setup('docs', app, openApiDocument, {
+    jsonDocumentUrl: 'docs/openapi.json',
+    customSiteTitle: 'Distributed Wagering Processor',
+  });
   return app;
 }

@@ -46,6 +46,8 @@ Para encerrar: `docker compose down`, ou `docker compose down -v` para apagar ta
 
 ## Usando a API
 
+A documentação interativa (Swagger UI) fica em **http://localhost:3000/docs**, e a raiz `/` redireciona para lá. Ela traz exemplos de cada operação (BET, WIN, LOSS, REFUND e ROLLBACK) e todas as respostas possíveis, e permite executar as requisições pelo navegador. A especificação OpenAPI está em `/docs/openapi.json`.
+
 ```bash
 # 1. Criar uma wallet (gera transação OPENING e lançamento CREDIT no ledger)
 curl -s -X POST localhost:3000/wallets -H 'content-type: application/json' -d '{

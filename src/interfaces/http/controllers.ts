@@ -8,6 +8,7 @@ import {
   Param,
   Post,
   Query,
+  Redirect,
   Req,
   Res,
 } from '@nestjs/common';
@@ -132,6 +133,10 @@ export class WageringController {
 @Public()
 export class HealthController {
   constructor(@Inject(CONTAINER) private readonly container: Container) {}
+
+  @Get()
+  @Redirect('/docs', 302)
+  root() {}
 
   @Get('health/live')
   live() {

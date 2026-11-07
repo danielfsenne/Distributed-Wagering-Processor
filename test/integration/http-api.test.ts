@@ -389,6 +389,35 @@ describe('HTTP API', () => {
       expect(response.body).toContain('wagering_processing_duration_seconds');
     });
 
+    it('serves the OpenAPI document and Swagger UI, redirecting the root to it', async () => {
+      const root = await fetch(`${http.baseUrl}/`, { redirect: 'manual' });
+      expect(root.status).toBe(302);
+      expect(root.headers.get('location')).toBe('/docs');
+
+      const ui = await fetch(`${http.baseUrl}/docs`);
+      expect(ui.status).toBe(200);
+      expect(await ui.text()).toContain('swagger-ui');
+
+      const spec = (await (await fetch(`${http.baseUrl}/docs/openapi.json`)).json()) as {
+        openapi: string;
+        paths: Record<string, unknown>;
+      };
+      expect(spec.openapi).toBe('3.0.3');
+      expect(Object.keys(spec.paths)).toEqual(
+        expect.arrayContaining([
+          '/wallets',
+          '/wallets/{walletId}',
+          '/wallets/{walletId}/ledger',
+          '/wallets/{walletId}/reconciliation',
+          '/wagering/transactions',
+          '/wagering/transactions/{transactionId}',
+          '/providers/{providerId}/wagering/transactions/{externalTransactionId}',
+          '/health/live',
+          '/health/ready',
+        ]),
+      );
+    });
+
     it('propagates the correlation id', async () => {
       const response = await call('GET', '/health/live', undefined, { 'x-correlation-id': 'corr-123' });
       expect(response.headers.get('x-correlation-id')).toBe('corr-123');
